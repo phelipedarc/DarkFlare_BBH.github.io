@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dark Flare — BBH mergers in AGN disks · Darc et al. 2025 / McKernan et al. 2019</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#05070D; --panel:#0C1320; --panel2:#0A101B; --line:#1B2A40; --line-soft:#131F31;
+    --text:#D9E4F5; --muted:#7E8FA8; --faint:#54627A;
+    --amber:#FFB454; --cyan:#6FE3FF;
+    --band-g:#56E8C2; --band-r:#FFA94D; --band-i:#DC8BE0;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+    --disp:'Space Grotesk',var(--sans);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--void);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  ::selection{background:#27405f;color:#fff}
+  button{font-family:var(--mono);cursor:pointer}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  /* ---------- hero / simulation ---------- */
+  .stage-wrap{position:relative;width:100%;height:min(72vh,760px);min-height:480px;border-bottom:1px solid var(--line)}
+  #stage{position:absolute;inset:0;width:100%;height:100%;display:block;background:radial-gradient(120% 90% at 50% 38%, #0A1322 0%, var(--void) 62%)}
+  .hud{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:22px clamp(16px,3.4vw,44px)}
+  .hud-top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
+  .masthead h1{font-family:var(--disp);font-weight:700;font-size:clamp(21px,2.6vw,31px);letter-spacing:.01em;line-height:1.12}
+  .masthead h1 em{font-style:normal;color:var(--amber)}
+  .masthead .sub{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:7px;max-width:52ch}
+  .clock{font-family:var(--mono);text-align:right;font-size:12px;color:var(--muted)}
+  .clock .big{display:block;font-size:clamp(17px,2vw,23px);color:var(--text);letter-spacing:.04em;margin-bottom:3px;font-variant-numeric:tabular-nums}
+  .clock .lbl{letter-spacing:.14em;font-size:10px;color:var(--faint)}
+  .hud-bottom{display:flex;flex-direction:column;gap:12px}
+  .phases{display:flex;gap:6px;flex-wrap:wrap;pointer-events:auto}
+  .phase{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;padding:7px 12px;border:1px solid var(--line);border-radius:3px;color:var(--faint);background:rgba(6,10,18,.55);backdrop-filter:blur(3px);transition:color .3s,border-color .3s}
+  .phase.on{color:var(--text);border-color:var(--amber);background:rgba(20,16,8,.6)}
+  .phase.on .dot{background:var(--amber)}
+  .phase .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--line);margin-right:7px;vertical-align:1px}
+  .stage-ctl{display:flex;gap:8px;align-items:center;pointer-events:auto;flex-wrap:wrap}
+  .stage-ctl button{background:rgba(8,13,22,.7);border:1px solid var(--line);color:var(--text);font-size:11.5px;letter-spacing:.06em;padding:8px 14px;border-radius:3px;backdrop-filter:blur(3px)}
+  .stage-ctl button:hover{border-color:var(--muted)}
+  .stage-ctl .spd{color:var(--muted);font-family:var(--mono);font-size:11px;margin-left:4px}
+  .stage-note{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.03em}
+
+  /* ---------- layout below ---------- */
+  .deck{max-width:1340px;margin:0 auto;padding:34px clamp(14px,3vw,40px) 70px;display:grid;grid-template-columns:360px 1fr;gap:26px}
+  @media(max-width:980px){.deck{grid-template-columns:1fr}}
+  .col-h{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:var(--faint);margin:2px 0 14px;display:flex;align-items:center;gap:10px}
+  .col-h::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+
+  /* FITS-card parameter controls — the signature device */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:13px 15px 14px;margin-bottom:10px}
+  .card .kw{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12.5px;margin-bottom:2px}
+  .card .kw .k{color:var(--amber);letter-spacing:.04em}
+  .card .kw .k::after{content:" ="; color:var(--faint)}
+  .card .kw .v{color:var(--text);font-variant-numeric:tabular-nums}
+  .card .cm{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-bottom:9px}
+  .card .cm::before{content:"/ ";color:var(--line)}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:3px;background:linear-gradient(90deg,var(--line) 0%,var(--line) 100%);border-radius:2px}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--text);border:2px solid var(--void);margin-top:-5.5px;box-shadow:0 0 0 1px var(--muted)}
+  input[type=range]:hover::-webkit-slider-thumb{background:var(--cyan)}
+  input[type=range]::-moz-range-track{height:3px;background:var(--line);border-radius:2px}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--text);border:1px solid var(--muted)}
+  .derived-pair{display:flex;gap:10px}
+  .derived-pair .card{flex:1}
+  .mini{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .mini b{color:var(--text);font-weight:500}
+  .warn{display:none;font-family:var(--mono);font-size:11px;color:#FFD27A;border:1px solid #5e4a1f;background:#181206;border-radius:4px;padding:9px 12px;margin-bottom:10px;line-height:1.5}
+  .warn.show{display:block}
+
+  /* light curve panel */
+  .lc-panel{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:18px 18px 12px;position:relative}
+  .lc-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px}
+  .lc-title{font-family:var(--disp);font-weight:500;font-size:16.5px}
+  .lc-title span{color:var(--muted);font-size:12.5px;font-family:var(--mono);margin-left:8px}
+  .seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .seg button{background:transparent;border:0;color:var(--muted);font-size:11px;letter-spacing:.05em;padding:7px 13px}
+  .seg button.on{background:#16233A;color:var(--text)}
+  #lc{width:100%;height:430px;display:block;cursor:crosshair}
+  .legend{display:flex;gap:18px;justify-content:center;font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:8px 0 4px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:7px;vertical-align:3px}
+  .readout{position:absolute;display:none;pointer-events:none;background:#0B1422F2;border:1px solid var(--line);border-radius:3px;padding:8px 11px;font-family:var(--mono);font-size:11px;color:var(--text);z-index:5;white-space:nowrap;line-height:1.7}
+
+  .qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:14px}
+  .q{background:var(--panel);border:1px solid var(--line-soft);border-radius:4px;padding:10px 12px}
+  .q .ql{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--faint);margin-bottom:4px}
+  .q .qv{font-family:var(--mono);font-size:14.5px;color:var(--text);font-variant-numeric:tabular-nums}
+  .q .qu{font-size:10.5px;color:var(--muted);margin-left:3px}
+  .q.g .qv{color:var(--band-g)}.q.r .qv{color:var(--band-r)}.q.i .qv{color:var(--band-i)}
+
+  .prose{max-width:1340px;margin:0 auto;padding:0 clamp(14px,3vw,40px) 90px;display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:22px}
+  .prose .blk h3{font-family:var(--disp);font-size:15px;font-weight:500;margin-bottom:8px;color:var(--text)}
+  .prose .blk h3 .n{color:var(--amber);font-family:var(--mono);font-size:12px;margin-right:8px}
+  .prose .blk p{font-size:13.5px;color:var(--muted)}
+  .foot{max-width:1340px;margin:0 auto;padding:0 clamp(14px,3vw,40px) 50px;font-family:var(--mono);font-size:11px;color:var(--faint);line-height:1.8;border-top:1px solid var(--line-soft);padding-top:22px}
+  .foot a{color:var(--muted)}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+</style>
+</head>
+<body>
+
+<!-- ============================ SIMULATION STAGE ============================ -->
+<div class="stage-wrap">
+  <canvas id="stage" aria-label="Animated visualization of a binary black hole merging inside an AGN accretion disk, the remnant receiving a recoil kick and lighting an off-center hot spot"></canvas>
+  <div class="hud">
+    <div class="hud-top">
+      <div class="masthead">
+        <h1><em>Dark Flare</em> — BBH merger in an AGN disk</h1>
+        <div class="sub">stellar-mass binary black hole merger (GW only, no prompt light) → gravitational-wave recoil → ram-stripped Hill sphere → off-center thermal "dark flare" · Darc et al. 2025 · McKernan et al. 2019</div>
+      </div>
+      <div class="clock">
+        <span class="lbl">OBSERVED TIME SINCE MERGER</span>
+        <span class="big" id="clock">T − …</span>
+        <span id="clock-sub">inspiral (time compressed)</span>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div class="phases">
+        <span class="phase" id="ph0"><span class="dot"></span>INSPIRAL</span>
+        <span class="phase" id="ph1"><span class="dot"></span>MERGER · GW ONLY</span>
+        <span class="phase" id="ph2"><span class="dot"></span>KICK · BOUND GAS (t &lt; t<sub>ram</sub>)</span>
+        <span class="phase" id="ph3"><span class="dot"></span>DARK FLARE</span>
+      </div>
+      <div class="stage-ctl">
+        <button id="btn-play">PAUSE</button>
+        <button id="btn-replay">REPLAY MERGER</button>
+        <button id="btn-spd">SPEED 1×</button>
+        <span class="stage-note">visual timescales compressed · clock shows model time</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ CONTROLS + LIGHT CURVE ============================ -->
+<main class="deck">
+  <section aria-label="Model parameters">
+    <div class="col-h">BINARY · PARAMETERS</div>
+
+    <div class="card">
+      <div class="kw"><span class="k">M1</span><span class="v"><span id="v-m1"></span> M<sub>☉</sub></span></div>
+      <div class="cm">primary black hole mass</div>
+      <input type="range" id="in-m1" min="5" max="150" step="1" value="35" aria-label="Primary mass">
+    </div>
+    <div class="card">
+      <div class="kw"><span class="k">M2</span><span class="v"><span id="v-m2"></span> M<sub>☉</sub></span></div>
+      <div class="cm">secondary black hole mass</div>
+      <input type="range" id="in-m2" min="5" max="150" step="1" value="28" aria-label="Secondary mass">
+    </div>
+    <div class="derived-pair">
+      <div class="card"><div class="mini">M<sub>chirp</sub> <b id="v-mc"></b> M<sub>☉</sub></div></div>
+      <div class="card"><div class="mini">M<sub>remnant</sub> <b id="v-mrem"></b> M<sub>☉</sub> <span style="color:var(--faint)">(5% → GW)</span></div></div>
+    </div>
+
+    <div class="card">
+      <div class="kw"><span class="k">VKICK</span><span class="v"><span id="v-vk"></span> km s<sup>−1</sup></span></div>
+      <div class="cm">GW recoil velocity of the remnant</div>
+      <input type="range" id="in-vk" min="50" max="1000" step="10" value="200" aria-label="Kick velocity">
+    </div>
+    <div class="card">
+      <div class="kw"><span class="k">THETAK</span><span class="v"><span id="v-th"></span>°</span></div>
+      <div class="cm">kick angle w.r.t. disk plane (visual; sets BHL phase end, Eq. for t_end)</div>
+      <input type="range" id="in-th" min="5" max="90" step="1" value="35" aria-label="Kick angle">
+    </div>
+
+    <div class="col-h" style="margin-top:22px">ENVIRONMENT · AGN DISK</div>
+    <div class="card">
+      <div class="kw"><span class="k">MSMBH</span><span class="v"><span id="v-ms"></span> M<sub>☉</sub></span></div>
+      <div class="cm">supermassive black hole mass (log slider)</div>
+      <input type="range" id="in-ms" min="5" max="9" step="0.05" value="8" aria-label="SMBH mass exponent">
+    </div>
+    <div class="card">
+      <div class="kw"><span class="k">RBH</span><span class="v"><span id="v-rb"></span> r<sub>g</sub></span></div>
+      <div class="cm">merger radius in the disk (log slider)</div>
+      <input type="range" id="in-rb" min="2" max="4" step="0.02" value="2.954" aria-label="Merger radius exponent">
+    </div>
+    <div class="card">
+      <div class="kw"><span class="k">RHO</span><span class="v"><span id="v-rho"></span> g cm<sup>−3</sup></span></div>
+      <div class="cm">disk gas density — drives the visual gas density &amp; BHL stage; this LC realization is rho-independent</div>
+      <input type="range" id="in-rho" min="-15" max="-10" step="0.1" value="-15" aria-label="Disk density exponent">
+    </div>
+
+    <div class="col-h" style="margin-top:22px">OBSERVER</div>
+    <div class="card">
+      <div class="kw"><span class="k">DLGW</span><span class="v"><span id="v-dl"></span> Mpc</span></div>
+      <div class="cm">GW luminosity distance</div>
+      <input type="range" id="in-dl" min="100" max="3000" step="10" value="1467" aria-label="Luminosity distance">
+    </div>
+    <div class="card">
+      <div class="kw"><span class="k">ZGW</span><span class="v"><span id="v-z"></span></span></div>
+      <div class="cm">redshift of the GW source (1467 Mpc ↔ z ≈ 0.282, WMAP9)</div>
+      <input type="range" id="in-z" min="0.01" max="1" step="0.005" value="0.282" aria-label="Redshift">
+    </div>
+
+    <div class="warn" id="warn-hill">R<sub>Hill</sub> &lt; H (disk height): the remnant carries little bound gas — weak / delayed flare regime.</div>
+    <div class="warn" id="warn-faint">Flare peaks fainter than the local AGN disk emission for these parameters — the curve dips below the pinned 28.8 mag baseline behavior of the reference code.</div>
+  </section>
+
+  <section aria-label="Light curve">
+    <div class="col-h">McKERNAN 2019 · LIVE LIGHT CURVES · LSST g r i</div>
+    <div class="lc-panel">
+      <div class="lc-head">
+        <div class="lc-title">Dark Flare · ram-stripped Hill sphere <span>sin² rise → e<sup>−t/τ</sup> decay</span></div>
+        <div class="seg" role="group" aria-label="Magnitude system">
+          <button id="seg-app" class="on">APPARENT</button>
+          <button id="seg-abs">ABSOLUTE</button>
+        </div>
+      </div>
+      <canvas id="lc"></canvas>
+      <div class="readout" id="lc-readout"></div>
+      <div class="legend">
+        <span><i style="background:var(--band-g)"></i>LSST g</span>
+        <span><i style="background:var(--band-r)"></i>LSST r</span>
+        <span><i style="background:var(--band-i)"></i>LSST i</span>
+        <span><i style="background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 8px)"></i>t<sub>ram</sub> (delay)</span>
+      </div>
+    </div>
+
+    <div class="qgrid" id="qgrid">
+      <div class="q"><div class="ql">T FLARE</div><div class="qv" id="q-tf"></div></div>
+      <div class="q"><div class="ql">T AGN DISK</div><div class="qv" id="q-ta"></div></div>
+      <div class="q"><div class="ql">R HILL</div><div class="qv" id="q-rh"></div></div>
+      <div class="q"><div class="ql">R BOUND GAS</div><div class="qv" id="q-rb"></div></div>
+      <div class="q"><div class="ql">DELAY t RAM (OBS)</div><div class="qv" id="q-tr"></div></div>
+      <div class="q"><div class="ql">DECAY τ (OBS)</div><div class="qv" id="q-tau"></div></div>
+      <div class="q g"><div class="ql">PEAK g</div><div class="qv" id="q-pg"></div></div>
+      <div class="q r"><div class="ql">PEAK r</div><div class="qv" id="q-pr"></div></div>
+      <div class="q i"><div class="ql">PEAK i</div><div class="qv" id="q-pi"></div></div>
+    </div>
+  </section>
+</main>
+
+<!-- ============================ MODEL NOTES ============================ -->
+<div class="prose">
+  <div class="blk"><h3><span class="n">I</span>Inspiral in the disk</h3>
+    <p>Gas torques in the AGN disk harden the stellar-mass binary at radius R<sub>BH</sub> ~ 10²–10⁴ r<sub>g</sub> from the SMBH until gravitational-wave emission takes over and drives it to merger. The binary carries a Hill sphere of bound disk gas, R<sub>Hill</sub> = R<sub>BH</sub>(q/3)<sup>1/3</sup>.</p></div>
+  <div class="blk"><h3><span class="n">II</span>Merger &amp; recoil</h3>
+    <p>The merger itself emits <b>no light</b> — only gravitational waves. Anisotropic GW emission kicks the remnant at v<sub>k</sub> ~ 10²–10³ km s<sup>−1</sup>. Gas within R<sub>bound</sub> ≈ 0.34 R<sub>Hill</sub>(q/10⁻⁶)<sup>2/3</sup>(R<sub>BH</sub>/10³)<sup>−1</sup>(v<sub>k</sub>/200)<sup>−2</sup> stays bound and is dragged along.</p></div>
+  <div class="blk"><h3><span class="n">III</span>Ram-pressure stripping</h3>
+    <p>Crossing the disk, the bound gas is shock-heated and stripped over t<sub>ram</sub> ≈ 20 (M<sub>BH</sub>/100)(v<sub>k</sub>/200)<sup>−3</sup> days, leaving an <b>off-center hot spot</b> at T ≈ 10⁵ (v<sub>k</sub>/100 km s<sup>−1</sup>) K. This delayed UV/optical transient — the <b>Dark Flare</b> — is the only electromagnetic counterpart of the merger.</p></div>
+  <div class="blk"><h3><span class="n">IV</span>Dark Flare &amp; decay</h3>
+    <p>The hot spot is modeled as a blackbody of radius R<sub>bound</sub>, redshifted, extincted (FM07, A<sub>V</sub>=1) and convolved with LSST g/r/i throughputs. The light curve rises as sin²(πt/2t<sub>ram</sub>) and decays as exp(−t/τ), with τ = R<sub>Hill</sub>R<sub>g</sub>/v<sub>k</sub> — the Graham et al. (2020) ZTF assumptions.</p></div>
+</div>
+
+<div class="foot">
+  PROJECT = 'Dark Flare' · developed by <b>P. Darc</b><br>
+  Based on: Darc, P., Bom, C. R., Kilpatrick, C. D., Souza Santos, A., Fraga, B., Rodríguez-Ramírez, J. C., Coulter, D. A., Mendes de Oliveira, C., Kanaan, A., Ribeiro, T., Schoenell, W., &amp; Lacerda, E. A. D. 2025, <i>Long-Term Optical Follow Up of S231206cc: Multi-Model Constraints on BBH Merger Emission in AGN Disks</i>, <a href="https://arxiv.org/abs/2506.02224" target="_blank" rel="noopener">arXiv:2506.02224</a> [astro-ph.HE]<br>
+  MODEL = 'Ram stripping of a kicked Hill sphere' · McKernan, Ford, Bartos et al. 2019, ApJL 884, L50 · light-curve shape per Graham et al. 2020 (ZTF19abanrhr)<br>
+  Implementation: faithful JavaScript port of the reference Python notebook — Planck spectrum on the notebook's 1000-point grid, Fitzpatrick &amp; Massa (2007) extinction (max dev &lt; 0.01 mag vs. the <code>extinction</code> package), real <code>speclite lsst2016</code> g/r/i throughputs embedded; peak AB magnitudes agree with the Python reference to ≤ 0.001 mag. The N-body view is a physically-motivated illustration: orbital frequencies, the GW chirp, kick direction and flare timing follow the model, but spatial scales and clock rates are compressed for legibility.
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   PART 1 — McKernan et al. 2019 model (validated JS port)
+   ================================================================ */
+const CGS = { h:6.62607015e-27, c:2.99792458e10, kB:1.380649e-16, G:6.6743e-8,
+              Msun:1.98892e33, pc:3.0856775814913673e18, day:86400, cAA:2.99792458e18 };
+
+const LSST = {"g":{"w":[3863,3894,3924,3955,3986,4016,4047,4077,4108,4139,4169,4200,4231,4261,4292,4322,4353,4384,4414,4445,4476,4506,4537,4567,4598,4629,4659,4690,4721,4751,4782,4812,4843,4874,4904,4935,4966,4996,5027,5057,5088,5119,5149,5180,5211,5241,5272,5302,5333,5364,5394,5425,5456,5486,5517,5547,5578,5609,5639,5670],"r":[0,0.01032,0.02584,0.05266,0.08233,0.11356,0.14792,0.18359,0.22258,0.25486,0.27367,0.28253,0.2914,0.29965,0.30791,0.31577,0.32301,0.32996,0.33681,0.3431,0.34952,0.35498,0.35983,0.36431,0.36881,0.37218,0.37584,0.37926,0.38248,0.38469,0.38756,0.3893,0.39219,0.39428,0.39494,0.3964,0.39797,0.39947,0.39917,0.39956,0.40109,0.40288,0.40416,0.40528,0.4059,0.40636,0.40591,0.40655,0.40673,0.40854,0.39238,0.35704,0.30724,0.25946,0.20946,0.1608,0.11004,0.05918,0.02552,0]},
+"r":{"w":[5369,5398,5426,5455,5484,5512,5541,5570,5598,5627,5656,5684,5713,5742,5770,5799,5828,5856,5885,5914,5942,5971,6000,6028,6057,6086,6114,6143,6172,6200,6229,6257,6286,6315,6343,6372,6401,6429,6458,6487,6515,6544,6573,6601,6630,6659,6687,6716,6745,6773,6802,6831,6859,6888,6917,6945,6974,7003,7031,7060],"r":[0,0.0233,0.05159,0.09995,0.14882,0.19611,0.2451,0.29399,0.34012,0.38791,0.41305,0.41943,0.421,0.42308,0.42583,0.42866,0.43042,0.43205,0.42998,0.42928,0.42695,0.42725,0.42756,0.42718,0.42767,0.42916,0.43223,0.43562,0.43931,0.44186,0.44447,0.44587,0.43781,0.44503,0.44721,0.44779,0.44843,0.44936,0.44994,0.44861,0.44904,0.45026,0.45126,0.45335,0.45365,0.45356,0.45302,0.45269,0.45166,0.44522,0.41855,0.36585,0.31284,0.23032,0.19867,0.15643,0.10808,0.05625,0.02557,0]},
+"i":{"w":[6759,6786,6812,6839,6866,6892,6919,6945,6972,6999,7025,7052,7079,7105,7132,7158,7185,7212,7238,7265,7292,7318,7345,7371,7398,7425,7451,7478,7505,7531,7558,7584,7611,7638,7664,7691,7718,7744,7771,7797,7824,7851,7877,7904,7931,7957,7984,8010,8037,8064,8090,8117,8144,8170,8197,8223,8250,8277,8303,8330],"r":[0,0.02318,0.04803,0.09573,0.13192,0.16469,0.22439,0.27517,0.32771,0.37204,0.41133,0.43771,0.43974,0.44111,0.44184,0.44041,0.40778,0.42619,0.41611,0.42424,0.42686,0.43363,0.44482,0.44527,0.44836,0.44985,0.45065,0.45096,0.45115,0.4515,0.45113,0.45049,0.17917,0.26672,0.39096,0.44086,0.45005,0.4507,0.45016,0.44996,0.44919,0.44826,0.44688,0.44342,0.44367,0.44311,0.44327,0.44052,0.4411,0.41914,0.37905,0.32911,0.27198,0.22207,0.17916,0.13679,0.09483,0.04708,0.0231,0]}};
+
+/* FM07 extinction, R_V = 3.1 (mirrors the `extinction` package) */
+const FM07 = (() => {
+  const rv=3.1, x0=4.592, gamma=0.922, c1=-0.175, c2=0.807, c3=2.991, c4=0.319, c5=6.097;
+  const D = x => x*x/(((x*x-x0*x0)**2)+x*x*gamma*gamma);
+  const kUV = x => { let k=c1+c2*x+c3*D(x); if(x>c5)k+=c4*(x-c5)**2; return k; };
+  const xk=[0,0.25,0.5,0.75,1,1e4/5530,1e4/4000,1e4/3300,3.7,4];
+  const kk=xk.map((x,i)=> i<5 ? (-0.83+0.63*rv)*Math.pow(x,1.84)-rv : i===5?0 : i===6?1.322 : i===7?2.055 : kUV(x));
+  const n=xk.length, a=kk.slice(), b=new Array(n-1), d=new Array(n-1), hh=[], al=new Array(n).fill(0);
+  for(let i=0;i<n-1;i++)hh.push(xk[i+1]-xk[i]);
+  for(let i=1;i<n-1;i++)al[i]=3/hh[i]*(a[i+1]-a[i])-3/hh[i-1]*(a[i]-a[i-1]);
+  const cc=new Array(n).fill(0), l=new Array(n).fill(1), mu=new Array(n).fill(0), zz=new Array(n).fill(0);
+  for(let i=1;i<n-1;i++){ l[i]=2*(xk[i+1]-xk[i-1])-hh[i-1]*mu[i-1]; mu[i]=hh[i]/l[i]; zz[i]=(al[i]-hh[i-1]*zz[i-1])/l[i]; }
+  for(let j=n-2;j>=0;j--){ cc[j]=zz[j]-mu[j]*cc[j+1]; b[j]=(a[j+1]-a[j])/hh[j]-hh[j]*(cc[j+1]+2*cc[j])/3; d[j]=(cc[j+1]-cc[j])/(3*hh[j]); }
+  const spl = x => { let j=n-2; for(let i=0;i<n-1;i++) if(x<xk[i+1]){j=i;break;}
+    const dx=x-xk[j]; return a[j]+b[j]*dx+cc[j]*dx*dx+d[j]*dx*dx*dx; };
+  return (waveAA,av) => { const x=1e4/waveAA*1e0; const k=(x>=3.7)?kUV(x):spl(x); return av*(1+k/rv); };
+})();
+
+const temperatureFlare = v => 1e5*(v/100);
+const gravRadiusCM = Ms => CGS.G*Ms*CGS.Msun/(CGS.c*CGS.c);
+const hillRadiusRg = (Ms,Mb,r) => r*Math.pow((Mb/Ms)/3,1/3);
+const durationFlareDays = (v,Ms,Mb,r) => hillRadiusRg(Ms,Mb,r)*gravRadiusCM(Ms)/(v*1e5)/CGS.day;
+const radiusBoundingGasRg = (Ms,Mb,r,v) => hillRadiusRg(Ms,Mb,r)*0.34*Math.pow((Mb/Ms)/1e-6,2/3)*Math.pow(r/1e3,-1)*Math.pow(v/200,-2);
+const tRamDays = (Mb,v) => 20*(Mb/100)*Math.pow(v/200,-3);
+const tempAGNDisk = (Ms,md,r) => 6e5*Math.pow(Ms/1e8,0.25)*Math.pow(md,0.25)*Math.pow(r,-0.75);
+const planck = (wcm,T) => (2*CGS.h*CGS.c*CGS.c/Math.pow(wcm,5))/Math.expm1(CGS.h*CGS.c/(wcm*CGS.kB*T));
+
+function abMagnitude(waveAA, flux, filt){
+  let num=0, den=0, j=0;
+  const fw=filt.w, fr=filt.r;
+  const val = (lam,R)=>{
+    while(j<waveAA.length-2 && waveAA[j+1]<lam)j++;
+    while(j>0 && waveAA[j]>lam)j--;
+    const t=(lam-waveAA[j])/(waveAA[j+1]-waveAA[j]);
+    const f=flux[j]+t*(flux[j+1]-flux[j]);
+    const fAB=3631e-23*CGS.cAA/(lam*lam);
+    return [f*R*lam, fAB*R*lam];
+  };
+  for(let i=0;i<fw.length-1;i++){
+    const dl=fw[i+1]-fw[i];
+    const [n1,d1]=val(fw[i],fr[i]), [n2,d2]=val(fw[i+1],fr[i+1]);
+    num+=0.5*(n1+n2)*dl; den+=0.5*(d1+d2)*dl;
+  }
+  return -2.5*Math.log10(num/den);
+}
+
+function mckernanLightCurve(p, absolute){
+  const {vKick,Msmbh,Mbh,rBH,DlMpc,z} = p;
+  const Rg=gravRadiusCM(Msmbh), Tflare=temperatureFlare(vKick);
+  const durationDays=durationFlareDays(vKick,Msmbh,Mbh,rBH);
+  const rHotRg=radiusBoundingGasRg(Msmbh,Mbh,rBH,vKick);
+  const rEm=rHotRg*Rg, Dcm=DlMpc*1e6*CGS.pc;
+  const N=1000, wR=new Array(N), wO=new Array(N);
+  for(let i=0;i<N;i++){ wR[i]=1000+19000*i/(N-1); wO[i]=wR[i]*(1+z); }
+  const spec=(T,rCm)=>{
+    const out=new Array(N), area=4*Math.PI*rCm*rCm;
+    for(let i=0;i<N;i++){
+      let f=planck(wR[i]*1e-8,T)*area/(4*Math.PI*Dcm*Dcm)*1e-8/(1+z);
+      out[i]=f*Math.pow(10,-0.4*FM07(wO[i],1));
+    }
+    return out;
+  };
+  const fF=spec(Tflare,rEm);
+  const peak={ g:abMagnitude(wO,fF,LSST.g), r:abMagnitude(wO,fF,LSST.r), i:abMagnitude(wO,fF,LSST.i) };
+  const Tagn=tempAGNDisk(Msmbh,0.05,rBH);
+  const fB=spec(Tagn,rBH*Rg);
+  const base={ g:abMagnitude(wO,fB,LSST.g), r:abMagnitude(wO,fB,LSST.r), i:abMagnitude(wO,fB,LSST.i) };
+  const baseUsed={};
+  for(const b of ['g','r','i']) baseUsed[b] = (peak[b] < base[b]) ? 28.8 : base[b];
+  const tram=tRamDays(Mbh,vKick)*(1+z);
+  const AtDec=durationDays*(1+z), AtDelay=tram;
+  const NP=170, time=[], lc={g:[],r:[],i:[]};
+  for(let i=0;i<=NP;i++){
+    const t=AtDelay*i/NP, s=Math.pow(Math.sin(Math.PI/2*(i/NP)),2);
+    time.push(t);
+    for(const b of ['g','r','i']) lc[b].push(baseUsed[b]-(baseUsed[b]-peak[b])*s);
+  }
+  for(let i=1;i<=NP;i++){
+    const t=AtDelay+4*AtDec*i/NP, e=Math.exp(-(t-AtDelay)/AtDec);
+    time.push(t);
+    for(const b of ['g','r','i']) lc[b].push(baseUsed[b]-(baseUsed[b]-peak[b])*e);
+  }
+  let dm=0;
+  if(absolute){ dm=5*(Math.log10(DlMpc*1e6)-1);
+    for(const b of ['g','r','i']) for(let i=0;i<lc[b].length;i++) lc[b][i]-=dm; }
+  return { time, lc, peak, base, baseUsed, Tflare, Tagn, durationDays, rHotRg, rEmCm:rEm,
+           tramObsDays:tram, tauObsDays:AtDec, hillRg:hillRadiusRg(Msmbh,Mbh,rBH), distMod:dm };
+}
+
+/* ================================================================
+   PART 2 — state, controls, formatting
+   ================================================================ */
+const $ = id => document.getElementById(id);
+const state = {
+  m1:35, m2:28, vKick:200, theta:35, Msmbh:1e8, rBH:900, rho:1e-15,
+  DlMpc:1467, z:0.282, absolute:false,
+  get Mbh(){ return 0.95*(this.m1+this.m2); },
+  get Mchirp(){ return Math.pow(this.m1*this.m2,0.6)/Math.pow(this.m1+this.m2,0.2); }
+};
+let model = null;
+
+const fmtSci = (x,d=1) => {
+  if(!isFinite(x)) return '—';
+  const e=Math.floor(Math.log10(Math.abs(x)));
+  if(e>=-2 && e<5) return x>=100? x.toFixed(0) : x.toPrecision(3);
+  return (x/Math.pow(10,e)).toFixed(d)+'×10'+supExp(e);
+};
+const supExp = e => String(e).split('').map(c=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[c]??(c==='-'?'⁻':c)).join('');
+const fmtDays = d => d<0.01? (d*24).toFixed(2)+' h' : d<10? d.toFixed(2)+' d' : d.toFixed(1)+' d';
+
+function readInputs(){
+  state.m1=+$('in-m1').value; state.m2=+$('in-m2').value;
+  state.vKick=+$('in-vk').value; state.theta=+$('in-th').value;
+  state.Msmbh=Math.pow(10,+$('in-ms').value);
+  state.rBH=Math.round(Math.pow(10,+$('in-rb').value));
+  state.rho=Math.pow(10,+$('in-rho').value);
+  state.DlMpc=+$('in-dl').value; state.z=+$('in-z').value;
+}
+function writeLabels(){
+  $('v-m1').textContent=state.m1; $('v-m2').textContent=state.m2;
+  $('v-mc').textContent=state.Mchirp.toFixed(1);
+  $('v-mrem').textContent=state.Mbh.toFixed(1);
+  $('v-vk').textContent=state.vKick; $('v-th').textContent=state.theta;
+  $('v-ms').textContent=fmtSci(state.Msmbh);
+  $('v-rb').textContent=state.rBH;
+  $('v-rho').textContent=fmtSci(state.rho);
+  $('v-dl').textContent=state.DlMpc; $('v-z').textContent=state.z.toFixed(3);
+}
+function recompute(){
+  model = mckernanLightCurve(
+    { vKick:state.vKick, Msmbh:state.Msmbh, Mbh:state.Mbh, rBH:state.rBH,
+      DlMpc:state.DlMpc, z:state.z }, state.absolute);
+  $('q-tf').innerHTML = fmtSci(model.Tflare)+'<span class="qu">K</span>';
+  $('q-ta').innerHTML = fmtSci(model.Tagn)+'<span class="qu">K</span>';
+  $('q-rh').innerHTML = fmtSci(model.hillRg,2)+'<span class="qu">r_g</span>';
+  $('q-rb').innerHTML = fmtSci(model.rHotRg,2)+'<span class="qu">r_g</span>';
+  $('q-tr').textContent = fmtDays(model.tramObsDays);
+  $('q-tau').textContent = fmtDays(model.tauObsDays);
+  const dm = state.absolute? model.distMod : 0;
+  $('q-pg').textContent=(model.peak.g-dm).toFixed(2);
+  $('q-pr').textContent=(model.peak.r-dm).toFixed(2);
+  $('q-pi').textContent=(model.peak.i-dm).toFixed(2);
+  $('warn-hill').classList.toggle('show', model.hillRg < 1);
+  $('warn-faint').classList.toggle('show', model.peak.g >= model.base.g);
+  drawLC();
+  sim.onModelChange();
+}
+
+for(const id of ['in-m1','in-m2','in-vk','in-th','in-ms','in-rb','in-rho','in-dl','in-z'])
+  $(id).addEventListener('input', ()=>{ readInputs(); writeLabels(); recompute(); });
+$('seg-app').addEventListener('click',()=>{ state.absolute=false;
+  $('seg-app').classList.add('on'); $('seg-abs').classList.remove('on'); recompute(); });
+$('seg-abs').addEventListener('click',()=>{ state.absolute=true;
+  $('seg-abs').classList.add('on'); $('seg-app').classList.remove('on'); recompute(); });
+
+/* ================================================================
+   PART 3 — light-curve plot (canvas, inverted magnitude axis)
+   ================================================================ */
+const lcCv = $('lc'), lcCtx = lcCv.getContext('2d');
+const bandCol = { g:'#56E8C2', r:'#FFA94D', i:'#DC8BE0' };
+let lcGeom = null;
+
+function drawLC(){
+  if(!model) return;
+  const dpr = window.devicePixelRatio||1;
+  const W = lcCv.clientWidth, H = lcCv.clientHeight;
+  if(lcCv.width!==W*dpr){ lcCv.width=W*dpr; lcCv.height=H*dpr; }
+  const ctx=lcCtx; ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const padL=58,padR=16,padT=14,padB=44;
+  const pw=W-padL-padR, ph=H-padT-padB;
+
+  const t=model.time, tmax=t[t.length-1];
+  let ymin=Infinity, ymax=-Infinity;
+  for(const b of ['g','r','i']) for(const v of model.lc[b]){ if(v<ymin)ymin=v; if(v>ymax)ymax=v; }
+  const yr = Math.max(ymax-ymin, 0.5); ymin-=yr*0.08; ymax+=yr*0.08;
+  const X = v => padL + v/tmax*pw;
+  const Y = v => padT + (v-ymin)/(ymax-ymin)*ph;   // mag axis inverted: bright (small) at top
+  lcGeom = {X,Y,padL,padT,pw,ph,tmax,ymin,ymax};
+
+  // grid + ticks
+  ctx.font='10.5px "IBM Plex Mono",monospace';
+  ctx.fillStyle='#54627A'; ctx.strokeStyle='#131F31'; ctx.lineWidth=1;
+  const yticks=niceTicks(ymin,ymax,6);
+  for(const v of yticks){
+    const y=Y(v); if(y<padT-1||y>padT+ph+1)continue;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+pw,y); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText(v.toFixed(1), padL-8, y+3.5);
+  }
+  const xticks=niceTicks(0,tmax,7);
+  for(const v of xticks){
+    const x=X(v); if(x<padL-1||x>padL+pw+1)continue;
+    ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,padT+ph); ctx.stroke();
+    ctx.textAlign='center'; ctx.fillText(tmax<5? v.toFixed(2): v<100? (+v.toFixed(1)).toString(): Math.round(v).toString(), x, padT+ph+18);
+  }
+  // axes labels
+  ctx.fillStyle='#7E8FA8'; ctx.textAlign='center';
+  ctx.fillText('observed days since merger', padL+pw/2, H-8);
+  ctx.save(); ctx.translate(13,padT+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText((state.absolute?'absolute':'apparent')+' magnitude (AB)',0,0); ctx.restore();
+  // frame
+  ctx.strokeStyle='#1B2A40'; ctx.strokeRect(padL,padT,pw,ph);
+
+  // t_ram dashed marker
+  const xtr=X(model.tramObsDays);
+  ctx.save(); ctx.setLineDash([4,4]); ctx.strokeStyle='#7E8FA8'; ctx.globalAlpha=.7;
+  ctx.beginPath(); ctx.moveTo(xtr,padT); ctx.lineTo(xtr,padT+ph); ctx.stroke(); ctx.restore();
+  ctx.fillStyle='#7E8FA8'; ctx.textAlign='left';
+  ctx.fillText('t_ram', Math.min(xtr+5,padL+pw-34), padT+12);
+
+  // curves
+  for(const b of ['g','r','i']){
+    ctx.beginPath();
+    const arr=model.lc[b];
+    for(let i=0;i<arr.length;i++){
+      const x=X(t[i]), y=Y(arr[i]);
+      i? ctx.lineTo(x,y): ctx.moveTo(x,y);
+    }
+    ctx.strokeStyle=bandCol[b]; ctx.lineWidth=2.4; ctx.globalAlpha=.92;
+    ctx.lineJoin='round'; ctx.stroke(); ctx.globalAlpha=1;
+  }
+}
+function niceTicks(a,b,n){
+  const span=b-a, step0=span/n, mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  let step=mag; for(const m of [1,2,2.5,5,10]) if(step0<=m*mag){step=m*mag;break;}
+  const out=[]; for(let v=Math.ceil(a/step)*step; v<=b+1e-9; v+=step) out.push(v);
+  return out;
+}
+// hover readout
+const ro=$('lc-readout');
+lcCv.addEventListener('mousemove', e=>{
+  if(!model||!lcGeom) return;
+  const r=lcCv.getBoundingClientRect();
+  const mx=e.clientX-r.left;
+  const tval=(mx-lcGeom.padL)/lcGeom.pw*lcGeom.tmax;
+  if(tval<0||tval>lcGeom.tmax){ro.style.display='none';return;}
+  let lo=0,hi=model.time.length-1;
+  while(hi-lo>1){const m=(lo+hi)>>1; model.time[m]<tval?lo=m:hi=m;}
+  const i=(tval-model.time[lo]<model.time[hi]-tval)?lo:hi;
+  ro.innerHTML=`t = ${fmtDays(model.time[i])}<br>`+
+    `<span style="color:${bandCol.g}">g ${model.lc.g[i].toFixed(2)}</span> `+
+    `<span style="color:${bandCol.r}">r ${model.lc.r[i].toFixed(2)}</span> `+
+    `<span style="color:${bandCol.i}">i ${model.lc.i[i].toFixed(2)}</span>`;
+  ro.style.display='block';
+  const panel=lcCv.parentElement.getBoundingClientRect();
+  ro.style.left=Math.min(e.clientX-panel.left+14, panel.width-150)+'px';
+  ro.style.top=(e.clientY-panel.top+10)+'px';
+});
+lcCv.addEventListener('mouseleave',()=>ro.style.display='none');
+new ResizeObserver(()=>drawLC()).observe(lcCv);
+
+/* ================================================================
+   PART 4 — simulation stage
+   ================================================================ */
+const cv=$('stage'), ctx=cv.getContext('2d');
+const PHASES=['inspiral','merger','kick','flare','idle'];
+const PHASE_DUR={inspiral:10, merger:1.4, kick:6, flare:14, idle:2.5};
+const INCL=0.40;
+
+const sim = {
+  t:0, phase:0, phaseT:0, speed:1, paused:false,
+  W:0,H:0,cx:0,cy:0,R:0,
+  particles:[], ripples:[],
+  binAngle:Math.random()*Math.PI*2, binPhi:0,
+  remnant:null, trail:[], hotspot:null, lastRho:null,
+  reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+
+  onModelChange(){
+    if(state.rho!==this.lastRho){ this.buildDisk(); this.lastRho=state.rho; }
+  },
+  resize(){
+    const dpr=devicePixelRatio||1;
+    const r=cv.getBoundingClientRect();
+    cv.width=r.width*dpr; cv.height=r.height*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    this.W=r.width; this.H=r.height;
+    this.cx=this.W*0.5; this.cy=this.H*0.52;
+    this.R=Math.min(this.W*0.46,this.H*0.78);
+    this.buildDisk();
+  },
+  buildDisk(){
+    const frac=( Math.log10(state.rho)+15 )/5;     // 0..1 over 1e-15..1e-10
+    const N=Math.round(1400+2400*frac);
+    this.particles=[];
+    for(let i=0;i<N;i++){
+      const u=Math.random();
+      const r=this.R*(0.14+0.86*Math.pow(u,0.62));  // denser inward
+      const rr=r/this.R;
+      this.particles.push({
+        r, th:Math.random()*Math.PI*2,
+        w:0.85*Math.pow(rr,-1.5)*0.045,             // Keplerian
+        z:(Math.random()-0.5)*Math.min(10,3+9*rr),  // disk thickness
+        s:0.7+Math.random()*1.7,
+        heat:rr
+      });
+    }
+  },
+  binRadiusFrac(){ return 0.20 + 0.74*((Math.log10(state.rBH)-2)/2); }, // 100..10000 rg
+  reset(){
+    this.phase=0; this.phaseT=0; this.ripples=[];
+    this.remnant=null; this.trail=[]; this.hotspot=null;
+    this.binPhi=Math.random()*6.28;
+  }
+};
+
+function diskProject(r,th,z=0){
+  return [ sim.cx + r*Math.cos(th),
+           sim.cy + r*Math.sin(th)*INCL + z ];
+}
+function tempColor(T){ // crude blackbody tint for hotspot: warm white -> blue-white
+  const x=Math.min(1,Math.max(0,(Math.log10(T)-4.7)/1.3));
+  const rC=Math.round(255-110*x), g=Math.round(235-15*x), b=Math.round(200+55*x);
+  return [rC,g,b];
+}
+function heatColor(h){ // disk: inner hot (pale gold) -> outer cool (deep amber/brown)
+  const inner=[255,236,200], outer=[150,78,30];
+  const k=Math.pow(h,0.7);
+  return `rgb(${Math.round(inner[0]+(outer[0]-inner[0])*k)},${Math.round(inner[1]+(outer[1]-inner[1])*k)},${Math.round(inner[2]+(outer[2]-inner[2])*k)})`;
+}
+
+function clampRemnant(){
+  // cap kicked-remnant displacement so it never leaves the stage
+  const dx=sim.remnant.x-sim.mergeX, dy=sim.remnant.y-sim.mergeY;
+  const d=Math.hypot(dx,dy), dmax=0.50*sim.R;
+  if(d>dmax){ sim.remnant.x=sim.mergeX+dx/d*dmax; sim.remnant.y=sim.mergeY+dy/d*dmax; }
+}
+
+function step(dt){
+  sim.t+=dt; sim.phaseT+=dt;
+  const ph=PHASES[sim.phase];
+  const dur=PHASE_DUR[ph];
+
+  // disk rotation
+  for(const p of sim.particles) p.th+=p.w*dt;
+
+  // binary about SMBH
+  const rb=sim.binRadiusFrac()*sim.R;
+  sim.binAngle += 0.05*Math.pow(rb/sim.R,-1.5)*0.20*dt;
+
+  if(ph==='inspiral'){
+    const prog=sim.phaseT/dur;
+    const a0=Math.min(34, 14+sim.R*0.035), af=2.2;
+    const a=af+(a0-af)*Math.pow(Math.max(1e-4,1-prog),0.25);
+    sim.binA=a;
+    sim.binPhi += (3.4*Math.pow(a0/a,1.5))*dt;
+    // GW ripples, rate grows toward merger
+    sim._gwAcc=(sim._gwAcc||0)+dt*(0.7+6*prog*prog);
+    if(sim._gwAcc>1){ sim._gwAcc=0;
+      const [bx,by]=diskProject(rb,sim.binAngle);
+      sim.ripples.push({x:bx,y:by,r:6,a:0.16+0.18*prog,w:1});
+    }
+    if(prog>=1){ sim.phase=1; sim.phaseT=0;
+      const [bx,by]=diskProject(rb,sim.binAngle);
+      sim.mergeX=bx; sim.mergeY=by;
+      // merger emits ONLY gravitational waves — no light
+      for(let k=0;k<7;k++) sim.ripples.push({x:bx,y:by,r:4+k*6,a:0.55-k*0.06,w:2.6});
+    }
+  }
+  else if(ph==='merger'){
+    if(sim.phaseT>=dur){
+      sim.phase=2; sim.phaseT=0;
+      // kick direction: in-plane tangential-ish + out-of-plane (theta)
+      const tang=sim.binAngle+Math.PI/2;
+      const thk=state.theta*Math.PI/180;
+      const inplane=Math.cos(thk);
+      const dx=Math.cos(tang)*inplane;
+      const dy=Math.sin(tang)*INCL*inplane - Math.sin(thk)*0.55;
+      const nrm=Math.hypot(dx,dy);
+      const spd=(16+50*Math.min(1,state.vKick/1000))*(sim.R/420);
+      sim.remnant={x:sim.mergeX,y:sim.mergeY,vx:dx/nrm*spd,vy:dy/nrm*spd};
+      sim.trail=[];
+    }
+  }
+  else if(ph==='kick'){
+    const u=sim.phaseT/dur;
+    sim.remnant.x+=sim.remnant.vx*dt;
+    sim.remnant.y+=sim.remnant.vy*dt;
+    clampRemnant();
+    sim.trail.push({x:sim.remnant.x,y:sim.remnant.y,a:1});
+    if(sim.trail.length>90)sim.trail.shift();
+    sim.kickU=u;
+    if(u>=1){
+      sim.phase=3; sim.phaseT=0;
+      // hot spot sits along the path, off-center from the SMBH (clamped near disk plane)
+      let ox=(sim.remnant.x-sim.mergeX)*0.55, oy=(sim.remnant.y-sim.mergeY)*0.55;
+      const onrm=Math.hypot(ox,oy), omax=0.18*sim.R;
+      if(onrm>omax){ ox*=omax/onrm; oy*=omax/onrm; }
+      const hx=sim.mergeX+ox, hy=sim.mergeY+oy;
+      sim.hotspot={x:hx,y:hy,
+        ang:Math.atan2(sim.remnant.y-sim.mergeY,sim.remnant.x-sim.mergeX)};
+    }
+  }
+  else if(ph==='flare'){
+    const u=sim.phaseT/dur;
+    sim.flareU=u;
+    // remnant keeps drifting, fading BHL tail
+    sim.remnant.x+=sim.remnant.vx*dt*0.45;
+    sim.remnant.y+=sim.remnant.vy*dt*0.45;
+    clampRemnant();
+    if(u>=1){ sim.phase=4; sim.phaseT=0; }
+  }
+  else if(ph==='idle'){
+    if(sim.phaseT>=dur) sim.reset();
+  }
+
+  // ripples expand
+  for(const rp of sim.ripples){ rp.r+=dt*(190+60*rp.w); rp.a-=dt*0.34; }
+  sim.ripples=sim.ripples.filter(r=>r.a>0.005 && r.r<sim.W);
+}
+
+function hotspotSizePx(){
+  // visual radius from R_bound (log-clamped)
+  const v=model? model.rHotRg : 1;
+  return (10+26*Math.min(1,Math.max(0,(Math.log10(Math.max(v,1e-3))+1)/4)))*(sim.R/420);
+}
+
+function draw(){
+  const W=sim.W,H=sim.H;
+  ctx.clearRect(0,0,W,H);
+
+  // faint starfield
+  if(!sim.stars){ sim.stars=[]; for(let i=0;i<130;i++)
+    sim.stars.push([Math.random()*W,Math.random()*H,Math.random()*1.1+0.2,Math.random()*0.5+0.12]); }
+  for(const [x,y,s,a] of sim.stars){ ctx.globalAlpha=a; ctx.fillStyle='#AFC4E0';
+    ctx.fillRect(x,y,s,s); }
+  ctx.globalAlpha=1;
+
+  // ---- accretion disk: under-glow, back half, SMBH, front half ----
+  {
+    ctx.save(); ctx.translate(sim.cx,sim.cy); ctx.scale(1,INCL);
+    let gd=ctx.createRadialGradient(0,0,sim.R*0.10,0,0,sim.R*1.02);
+    gd.addColorStop(0,'rgba(255,190,110,0.22)');
+    gd.addColorStop(0.45,'rgba(225,140,60,0.13)');
+    gd.addColorStop(1,'rgba(180,95,40,0)');
+    ctx.fillStyle=gd; ctx.beginPath(); ctx.arc(0,0,sim.R*1.02,0,6.29); ctx.fill();
+    ctx.restore();
+  }
+  const back=[], front=[];
+  for(const p of sim.particles) (Math.sin(p.th)<0?back:front).push(p);
+  const drawPart=arr=>{
+    for(const p of arr){
+      const [x,y]=diskProject(p.r,p.th,p.z*INCL);
+      const rr=p.r/sim.R;
+      ctx.globalAlpha=0.35+0.45*Math.pow(1-rr,1.5);
+      ctx.fillStyle=heatColor(rr);
+      ctx.fillRect(x,y,p.s,p.s);
+    }
+    ctx.globalAlpha=1;
+  };
+  drawPart(back);
+
+  // inner glow ring around SMBH
+  const ir=sim.R*0.14;
+  ctx.save(); ctx.translate(sim.cx,sim.cy); ctx.scale(1,INCL+0.12);
+  let grad=ctx.createRadialGradient(0,0,ir*0.2,0,0,ir*1.7);
+  grad.addColorStop(0,'rgba(255,225,170,0.55)');
+  grad.addColorStop(0.55,'rgba(255,170,80,0.16)');
+  grad.addColorStop(1,'rgba(255,170,80,0)');
+  ctx.fillStyle=grad;
+  ctx.beginPath(); ctx.arc(0,0,ir*1.7,0,6.29); ctx.fill(); ctx.restore();
+
+  // SMBH shadow + photon ring
+  ctx.beginPath(); ctx.arc(sim.cx,sim.cy,ir*0.34,0,6.29);
+  ctx.fillStyle='#000'; ctx.fill();
+  ctx.beginPath(); ctx.arc(sim.cx,sim.cy,ir*0.36,0,6.29);
+  ctx.strokeStyle='rgba(255,230,190,0.8)'; ctx.lineWidth=1.4; ctx.stroke();
+
+  drawPart(front);
+
+  // ---- GW ripples ----
+  for(const rp of sim.ripples){
+    ctx.beginPath();
+    ctx.save(); ctx.translate(rp.x,rp.y); ctx.scale(1,0.62);
+    ctx.arc(0,0,rp.r,0,6.29); ctx.restore();
+    ctx.strokeStyle=`rgba(140,190,255,${rp.a})`;
+    ctx.lineWidth=rp.w; ctx.stroke();
+  }
+
+  const ph=PHASES[sim.phase];
+  const rb=sim.binRadiusFrac()*sim.R;
+
+  // ---- binary ----
+  if(ph==='inspiral'){
+    const [bx,by]=diskProject(rb,sim.binAngle);
+    // Hill sphere
+    ctx.save(); ctx.setLineDash([3,5]);
+    ctx.beginPath(); ctx.arc(bx,by,hotspotSizePx()*1.5+10,0,6.29);
+    ctx.strokeStyle='rgba(111,227,255,0.25)'; ctx.lineWidth=1; ctx.stroke(); ctx.restore();
+    const mt=state.m1+state.m2;
+    const a=sim.binA||16;
+    const r1=a*state.m2/mt, r2=a*state.m1/mt;
+    const drawBH=(x,y,m)=>{
+      const rad=2.0+1.9*Math.cbrt(m/35);
+      let g2=ctx.createRadialGradient(x,y,rad*0.4,x,y,rad*3.1);
+      g2.addColorStop(0,'rgba(255,210,150,0.85)');
+      g2.addColorStop(1,'rgba(255,180,84,0)');
+      ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(x,y,rad*3.1,0,6.29); ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,rad,0,6.29); ctx.fillStyle='#000'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,rad+0.7,0,6.29);
+      ctx.strokeStyle='rgba(255,235,205,0.9)'; ctx.lineWidth=0.9; ctx.stroke();
+    };
+    drawBH(bx+r1*Math.cos(sim.binPhi), by+r1*Math.sin(sim.binPhi)*0.62, state.m1);
+    drawBH(bx-r2*Math.cos(sim.binPhi), by-r2*Math.sin(sim.binPhi)*0.62, state.m2);
+  }
+
+  // ---- merger: dark remnant only (no electromagnetic flash) ----
+  if(ph==='merger'){
+    drawRemnant(sim.mergeX,sim.mergeY);
+  }
+
+  // ---- remnant + bound gas + hotspot ----
+  const hsR=hotspotSizePx();
+  const [tr,tg,tb]=tempColor(model? model.Tflare:2e5);
+
+  if(ph==='kick' && sim.remnant){
+    // trail
+    for(let i=0;i<sim.trail.length;i++){
+      const t=sim.trail[i], a=(i/sim.trail.length)*0.35;
+      ctx.fillStyle=`rgba(${tr},${tg},${tb},${a})`;
+      ctx.fillRect(t.x,t.y,1.6,1.6);
+    }
+    // brightening shocked gas along the path (sin^2 rise, as the model)
+    const u=sim.kickU||0, bri=Math.pow(Math.sin(Math.PI/2*u),2);
+    let ox=(sim.remnant.x-sim.mergeX)*0.55, oy=(sim.remnant.y-sim.mergeY)*0.55;
+    const onrm=Math.hypot(ox,oy), omax=0.18*sim.R;
+    if(onrm>omax){ ox*=omax/onrm; oy*=omax/onrm; }
+    const hx=sim.mergeX+ox, hy=sim.mergeY+oy;
+    drawHotspot(hx,hy,hsR*(0.4+0.6*u),bri*0.9,[tr,tg,tb],
+      Math.atan2(sim.remnant.y-sim.mergeY,sim.remnant.x-sim.mergeX));
+    // bound-gas cloud dragged by the remnant
+    let g4=ctx.createRadialGradient(sim.remnant.x,sim.remnant.y,0,sim.remnant.x,sim.remnant.y,hsR*0.8);
+    g4.addColorStop(0,`rgba(${tr},${tg},${tb},${0.6*(1-0.6*u)})`);
+    g4.addColorStop(1,`rgba(${tr},${tg},${tb},0)`);
+    ctx.fillStyle=g4; ctx.beginPath();
+    ctx.arc(sim.remnant.x,sim.remnant.y,hsR*0.8,0,6.29); ctx.fill();
+    drawRemnant(sim.remnant.x,sim.remnant.y);
+  }
+  if(ph==='flare' || ph==='idle'){
+    const u=ph==='flare'? (sim.flareU||0) : 1;
+    const bri=Math.exp(-4*u);
+    if(sim.hotspot) drawHotspot(sim.hotspot.x,sim.hotspot.y,hsR,(0.12+0.88*bri),[tr,tg,tb],sim.hotspot.ang);
+    if(ph==='flare' && sim.remnant){
+      // faint BHL wake
+      ctx.globalAlpha=0.35*(1-u);
+      ctx.strokeStyle=`rgb(${tr},${tg},${tb})`; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(sim.remnant.x-sim.remnant.vx*0.35,sim.remnant.y-sim.remnant.vy*0.35);
+      ctx.lineTo(sim.remnant.x,sim.remnant.y); ctx.stroke(); ctx.globalAlpha=1;
+      drawRemnant(sim.remnant.x,sim.remnant.y,1-0.6*u);
+    }
+  }
+  function drawRemnant(x,y,al=1){
+    ctx.globalAlpha=al;
+    ctx.beginPath(); ctx.arc(x,y,3.4,0,6.29); ctx.fillStyle='#000'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,4.1,0,6.29);
+    ctx.strokeStyle='rgba(200,230,255,0.95)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  function drawHotspot(x,y,r,a,[cr,cg,cb],ang){
+    ctx.save(); ctx.translate(x,y); ctx.rotate(ang); ctx.scale(1.45,0.85);
+    let g5=ctx.createRadialGradient(0,0,0,0,0,r*2.4);
+    g5.addColorStop(0,`rgba(255,255,255,${Math.min(1,1.0*a)})`);
+    g5.addColorStop(0.30,`rgba(${cr},${cg},${cb},${0.78*a})`);
+    g5.addColorStop(0.65,`rgba(${cr},${cg},${cb},${0.28*a})`);
+    g5.addColorStop(1,`rgba(${cr},${cg},${cb},0)`);
+    ctx.fillStyle=g5; ctx.beginPath(); ctx.arc(0,0,r*2.4,0,6.29); ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* HUD: phase chips + observed-time clock */
+function updateHUD(){
+  const ph=PHASES[sim.phase];
+  ['ph0','ph1','ph2','ph3'].forEach((id,i)=>$(id).classList.toggle('on',
+    i===Math.min(sim.phase, 3) && ph!=='idle' || (ph==='idle'&&i===3)));
+  let txt='', sub='';
+  if(!model){ $('clock').textContent='—'; return; }
+  if(ph==='inspiral'){ txt='T − …'; sub='inspiral (time compressed)'; }
+  else if(ph==='merger'){ txt='T + 0.0 d'; sub='merger · GW burst'; }
+  else if(ph==='kick'){ const d=model.tramObsDays*(sim.kickU||0);
+    txt='T + '+fmtDays(d); sub='remnant inside bound gas'; }
+  else { const d=model.tramObsDays+4*model.tauObsDays*(ph==='flare'?(sim.flareU||0):1);
+    txt='T + '+fmtDays(d); sub='hot spot cooling (exp decay)'; }
+  $('clock').textContent=txt; $('clock-sub').textContent=sub;
+}
+
+/* loop */
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000)*sim.speed;
+  last=now;
+  if(!sim.paused){ step(dt); }
+  draw(); updateHUD();
+  requestAnimationFrame(loop);
+}
+
+/* stage controls */
+$('btn-play').addEventListener('click',()=>{
+  sim.paused=!sim.paused;
+  $('btn-play').textContent=sim.paused?'PLAY':'PAUSE';
+});
+$('btn-replay').addEventListener('click',()=>{ sim.reset(); sim.paused=false;
+  $('btn-play').textContent='PAUSE'; });
+const SPEEDS=[0.5,1,2,4]; let spdIx=1;
+$('btn-spd').addEventListener('click',()=>{
+  spdIx=(spdIx+1)%SPEEDS.length; sim.speed=SPEEDS[spdIx];
+  $('btn-spd').textContent='SPEED '+SPEEDS[spdIx]+'×';
+});
+
+/* init */
+window.addEventListener('resize',()=>sim.resize());
+readInputs(); writeLabels();
+sim.resize(); sim.lastRho=state.rho;
+recompute();
+if(sim.reduced){ sim.paused=true; $('btn-play').textContent='PLAY'; }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
