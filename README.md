@@ -19,17 +19,6 @@ Developed by **P. Darc**, based on:
 Model: McKernan, Ford, Bartos et al. 2019, ApJL 884, L50; light-curve shape per
 Graham et al. 2020 (ZTF19abanrhr).
 
-## Deploy on GitHub Pages
-
-The whole site is one self-contained file (`index.html`) — no build step, no
-dependencies (fonts load from Google Fonts; everything else is embedded).
-
-1. Create a repository, e.g. `darkflare` (or `<username>.github.io` for a root site).
-2. Add `index.html` and this `README.md` to the repository root and push.
-3. On GitHub: **Settings → Pages → Build and deployment** — Source: *Deploy from
-   a branch*; Branch: `main`, folder `/ (root)`. Save.
-4. After ~1 minute the page is live at `https://<username>.github.io/darkflare/`.
-
 ## Citation
 
 ```bibtex
