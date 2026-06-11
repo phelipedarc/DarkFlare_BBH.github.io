@@ -162,11 +162,11 @@
       <div class="cm">GW recoil velocity of the remnant</div>
       <input type="range" id="in-vk" min="50" max="1000" step="10" value="200" aria-label="Kick velocity">
     </div>
-    <!-- <div class="card">
+    <div class="card">
       <div class="kw"><span class="k">THETAK</span><span class="v"><span id="v-th"></span>°</span></div>
       <div class="cm">kick angle w.r.t. disk plane (visual; sets BHL phase end, Eq. for t_end)</div>
       <input type="range" id="in-th" min="5" max="90" step="1" value="35" aria-label="Kick angle">
-    </div> -->
+    </div>
 
     <div class="col-h" style="margin-top:22px">ENVIRONMENT · AGN DISK</div>
     <div class="card">
@@ -179,11 +179,11 @@
       <div class="cm">merger radius in the disk (log slider)</div>
       <input type="range" id="in-rb" min="2" max="4" step="0.02" value="2.954" aria-label="Merger radius exponent">
     </div>
-    <!-- <div class="card">
+    <div class="card">
       <div class="kw"><span class="k">RHO</span><span class="v"><span id="v-rho"></span> g cm<sup>−3</sup></span></div>
       <div class="cm">disk gas density — drives the visual gas density &amp; BHL stage; this LC realization is rho-independent</div>
       <input type="range" id="in-rho" min="-15" max="-10" step="0.1" value="-15" aria-label="Disk density exponent">
-    </div> -->
+    </div>
 
     <div class="col-h" style="margin-top:22px">OBSERVER</div>
     <div class="card">
@@ -191,11 +191,11 @@
       <div class="cm">GW luminosity distance</div>
       <input type="range" id="in-dl" min="100" max="3000" step="10" value="1467" aria-label="Luminosity distance">
     </div>
-    <!-- <div class="card">
+    <div class="card">
       <div class="kw"><span class="k">ZGW</span><span class="v"><span id="v-z"></span></span></div>
       <div class="cm">redshift of the GW source (1467 Mpc ↔ z ≈ 0.282, WMAP9)</div>
       <input type="range" id="in-z" min="0.01" max="1" step="0.005" value="0.282" aria-label="Redshift">
-    </div> -->
+    </div>
 
     <div class="warn" id="warn-hill">R<sub>Hill</sub> &lt; H (disk height): the remnant carries little bound gas — weak / delayed flare regime.</div>
     <div class="warn" id="warn-faint">Flare peaks fainter than the local AGN disk emission for these parameters — the curve dips below the pinned 28.8 mag baseline behavior of the reference code.</div>
